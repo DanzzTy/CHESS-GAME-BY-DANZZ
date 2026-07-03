@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chess game by Danzz</title>
+
+<style>
+body{
+    margin:0;
+    background:#1e1e1e;
+    color:#fff;
+    font-family:Arial;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+h2{margin:15px;}
+#turn{
+    margin-bottom:10px;
+    font-size:20px;
+}
+#board{
+    display:grid;
+    grid-template-columns:repeat(8,60px);
+    border:4px solid white;
+}
+.cell{
+    width:60px;
+    height:60px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:38px;
+    cursor:pointer;
+    user-select:none;
+}
+.light{background:#f0d9b5;}
+.dark{background:#b58863;}
+.selected{
+    outline:3px solid red;
+}
+button{
+    margin:15px;
+    padding:10px 20px;
+    font-size:16px;
+}
+</style>
+</head>
+<body>
+
+<h2>♟ Chess game</h2>
+<div id="turn">Giliran: Putih</div>
+
+<div id="board"></div>
+
+<button onclick="resetGame()">Restart</button>
+
+<script>
+
+const white="♔♕♖♗♘♙";
+const black="♚♛♜♝♞♟";
+
+let turn="white";
+let selected=null;
+
+let board=[
+
+["♜","♞","♝","♛","♚","♝","♞","♜"],
+["♟","♟","♟","♟","♟","♟","♟","♟"],
+["","","","","","","",""],
+["","","","","","","",""],
+["","","","","","","",""],
+["","","","","","","",""],
+["♙","♙","♙","♙","♙","♙","♙","♙"],
+["♖","♘","♗","♕","♔","♗","♘","♖"]
+
+];
+
+function draw(){
+
+let html="";
+
+for(let y=0;y<8;y++){
+
+for(let x=0;x<8;x++){
+
+let cls=((x+y)%2==0)?"light":"dark";
+
+if(selected&&selected.x==x&&selected.y==y)
+cls+=" selected";
+
+html+=`
+<div class="cell ${cls}"
+onclick="clickCell(${x},${y})">
+${board[y][x]}
+</div>
+`;
+
+}
+
+}
+
+document.getElementById("board").innerHTML=html;
+
+}
+
+function clickCell(x,y){
+
+let piece=board[y][x];
+
+if(selected==null){
+
+    if(piece=="") return;
+
+    if(turn=="white"&&!white.includes(piece)) return;
+    if(turn=="black"&&!black.includes(piece)) return;
+
+    selected={x,y};
+    draw();
+    return;
+}
+
+let sx=selected.x;
+let sy=selected.y;
+let moving=board[sy][sx];
+
+if(turn=="white"&&white.includes(piece)){
+    selected={x,y};
+    draw();
+    return;
+}
+
+if(turn=="black"&&black.includes(piece)){
+    selected={x,y};
+    draw();
+    return;
+}
+
+let valid=false;
+
+// ===== Aturan Pion =====
+if(moving=="♙"){
+
+    if(x==sx && y==sy-1 && board[y][x]=="")
+        valid=true;
+
+    if(sy==6 && x==sx && y==4 &&
+       board[5][sx]=="" &&
+       board[4][sx]=="")
+        valid=true;
+
+    if(Math.abs(x-sx)==1 &&
+       y==sy-1 &&
+       black.includes(board[y][x]))
+        valid=true;
+
+}
+
+if(moving=="♟"){
+
+    if(x==sx && y==sy+1 && board[y][x]=="")
+        valid=true;
+
+    if(sy==1 && x==sx && y==3 &&
+       board[2][sx]=="" &&
+       board[3][sx]=="")
+        valid=true;
+
+    if(Math.abs(x-sx)==1 &&
+       y==sy+1 &&
+       white.includes(board[y][x]))
+        valid=true;
+
+}
+
+  // ===== Aturan Kuda =====
+if(moving=="♘" || moving=="♞"){
+
+    let dx=Math.abs(x-sx);
+    let dy=Math.abs(y-sy);
+
+    if((dx==2 && dy==1) || (dx==1 && dy==2)){
+        valid=true;
+    }
+
+  // ===== Aturan Benteng =====
+if(moving=="♖" || moving=="♜"){
+
+    if(x==sx || y==sy){
+
+        let clear=true;
+
+        if(x==sx){
+
+            let step=(y>sy)?1:-1;
+
+            for(let i=sy+step;i!=y;i+=step){
+
+                if(board[i][x]!=""){
+                    clear=false;
+                    break;
+                }
+
+            }
+
+        }else{
+
+            let step=(x>sx)?1:-1;
+
+            for(let i=sx+step;i!=x;i+=step){
+
+                if(board[y][i]!=""){
+                    clear=false;
+                    break;
+                }
+
+            }
+
+        }
+
+        if(clear)
+            valid=true;
+
+    }
+
+  }
+
+  // ===== Aturan Gajah =====
+if(moving=="♗" || moving=="♝"){
+
+    let dx=x-sx;
+    let dy=y-sy;
+
+    if(Math.abs(dx)==Math.abs(dy)){
+
+        let stepX=dx>0?1:-1;
+        let stepY=dy>0?1:-1;
+
+        let cx=sx+stepX;
+        let cy=sy+stepY;
+
+        let clear=true;
+
+        while(cx!=x && cy!=y){
+
+            if(board[cy][cx]!=""){
+                clear=false;
+                break;
+            }
+
+            cx+=stepX;
+            cy+=stepY;
+        }
+
+        if(clear)
+            valid=true;
+
+    }
+
+ }
+
+  // ===== Aturan Ratu =====
+if(moving=="♕" || moving=="♛"){
+
+    let clear=false;
+
+    // Gerak lurus (seperti benteng)
+    if(x==sx || y==sy){
+
+        clear=true;
+
+        if(x==sx){
+
+            let step=(y>sy)?1:-1;
+
+            for(let i=sy+step;i!=y;i+=step){
+
+                if(board[i][x]!=""){
+                    clear=false;
+                    break;
+                }
+
+            }
+
+        }else{
+
+            let step=(x>sx)?1:-1;
+
+            for(let i=sx+step;i!=x;i+=step){
+
+                if(board[y][i]!=""){
+                    clear=false;
+                    break;
+                }
+
+            }
+
+        }
+
+    }
+
+    // Gerak diagonal (seperti gajah)
+    else if(Math.abs(x-sx)==Math.abs(y-sy)){
+
+        clear=true;
+
+        let stepX=(x>sx)?1:-1;
+        let stepY=(y>sy)?1:-1;
+
+        let cx=sx+stepX;
+        let cy=sy+stepY;
+
+        while(cx!=x){
+
+            if(board[cy][cx]!=""){
+                clear=false;
+                break;
+            }
+
+            cx+=stepX;
+            cy+=stepY;
+
+        }
+
+    }
+
+    if(clear)
+        valid=true;
+
+}
+
+  // ===== Aturan Raja =====
+if(moving=="♔" || moving=="♚"){
+
+    let dx=Math.abs(x-sx);
+    let dy=Math.abs(y-sy);
+
+    // Raja hanya boleh bergerak 1 kotak ke segala arah
+    if(dx<=1 && dy<=1 && (dx+dy>0)){
+        valid=true;
+    }
+
+              }
+
+// ===== Bidak lain sementara bebas =====
+if(!"♙♟♘♞♖♜♗♝♕♛♔♚".includes(moving))
+    valid=true;
+
+if(valid){
+
+    board[y][x]=moving;
+    board[sy][sx]="";
+
+    turn=turn=="white"?"black":"white";
+
+    document.getElementById("turn").innerHTML=
+    "Giliran: "+(turn=="white"?"Putih":"Hitam");
+}
+
+selected=null;
+draw();
+
+  }
+
+draw();
+
+}
+
+function resetGame(){
+
+turn="white";
+
+selected=null;
+
+board=[
+
+["♜","♞","♝","♛","♚","♝","♞","♜"],
+["♟","♟","♟","♟","♟","♟","♟","♟"],
+["","","","","","","",""],
+["","","","","","","",""],
+["","","","","","","",""],
+["","","","","","","",""],
+["♙","♙","♙","♙","♙","♙","♙","♙"],
+["♖","♘","♗","♕","♔","♗","♘","♖"]
+
+];
+
+document.getElementById("turn").innerHTML="Giliran: Putih";
+
+draw();
+
+}
+
+draw();
+
+</script>
+
+</body>
+  </html>
