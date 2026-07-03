@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Catur Sederhana Lengkap</title>
+    
+    <!-- Memuat pustaka CSS untuk papan catur -->
+    <link rel="stylesheet" href="https://unpkg.com">
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f2f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 30px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #myBoard {
+            width: 100%;
+            margin: 0 auto;
+        }
+        .info {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        .btn-reset {
+            margin-top: 15px;
+            padding: 10px 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: white;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-reset:hover {
+            background-color: #0056b3;
+        }
+        .btn-reset:active {
+            background-color: #004085;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Game Catur Interaktif</h2>
+        <div id="myBoard"></div>
+        <div class="info">Status: <span id="status">Giliran Putih</span></div>
+        <!-- Tombol Mulai Ulang Baru -->
+        <button class="btn-reset" id="resetBtn">Mulai Ulang</button>
+    </div>
+
+    <!-- Memuat pustaka jQuery, chess.js, dan chessboard.js -->
+    <script src="https://jquery.com"></script>
+    <script src="https://cloudflare.com"></script>
+    <script src="https://unpkg.com"></script>
+
+    <script>
+        var board = null;
+        var game = new Chess();
+        var $status = $('#status');
+
+        // Fungsi Audio Sintetis untuk efek suara tanpa file eksternal
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'move') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(350, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } 
+            else if (type === 'capture') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(120, audioCtx.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            }
+            else if (type === 'checkmate') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.8);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.8);
+            }
+        }
+
+        // Memvalidasi saat pemain mulai menyeret bidak
+        function onDragStart (source, piece, position, orientation) {
+            if (game.game_over() === true ||
+                (game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+                (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+                return false;
+            }
+        }
+
+        // Memproses langkah saat bidak dilepas
+        function onDrop (source, target) {
+            var targetPiece = game.get(target);
+
+            // Coba lakukan langkah
+            var move = game.move({
+                from: source,
+                to: target,
+                promotion: 'q'
+            });
+
+            // Jika langkah tidak sah, kembalikan bidak
+            if (move === null) return 'snapback';
+
+            // Cek status permainan SETELAH langkah dilakukan
+            if (game.in_checkmate() === true) {
+                playSound('checkmate');
+            } else if (targetPiece || move.captured) {
+                playSound('capture');
+            } else {
+                playSound('move');
+            }
+
+            updateStatus();
+        }
+
+        // Sinkronisasi posisi papan dengan animasi transisi
+        function onSnapEnd () {
+            board.position(game.fen());
+        }
+
+        // Memperbarui teks info status permainan
+        function updateStatus () {
+            var status = '';
+            var moveColor = (game.turn() === 'b') ? 'Hitam' : 'Putih';
+
+            if (game.in_checkmate() === true) {
+                status = 'Game Over, ' + moveColor + ' terkena skak mat.';
+            } else if (game.in_draw() === true) {
+                status = 'Game Over, Remis (Draw).';
+            } else {
+                status = 'Giliran ' + moveColor;
+                if (game.in_check() === true) {
+                    status += ', ' + moveColor + ' sedang SKAK!';
+                }
+            }
+
+            $status.html(status);
+        }
+
+        // Konfigurasi Papan Catur
+        var config = {
+            draggable: true,
+            position: 'start',
+            onDragStart: onDragStart,
+            onDrop: onDrop,
+            onSnapEnd: onSnapEnd,
+            moveSpeed: 'fast',
+            snapbackSpeed: 200,
+            snapSpeed: 100
+        };
+
+        // Inisialisasi Papan
+        board = Chessboard('myBoard', config);
+        updateStatus();
+
+        // Logika fungsi tombol Mulai Ulang saat diklik
+        $('#resetBtn').on('click', function () {
+            game.reset();             // Mengembalikan logika aturan internal ke awal
+            board.start();            // Mengembalikan bidak visual papan ke posisi start
+            updateStatus();           // Memperbarui teks status menjadi "Giliran Putih"
+            playSound('move');        // Efek suara penanda permainan dimulai kembali
+        });
+    </script>
+</body>
+</html>
